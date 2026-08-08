@@ -1,0 +1,33 @@
+models:
+  dummy_analysis:
+    full_match_analysis:
+      id: "dummy_full_match_analysis_v1"
+      model_name: "DummyFullMatchAnalysisTask"
+      model_version: "0.1.0"
+      description: "6회차용 dummy analysis task. 실제 AI 모델 없이 job 상태 흐름만 검증한다."
+      checkpoint_path: null
+      config_path: null
+      enabled: true
+
+  highlight_spotting:
+    champion:
+      id: "soccer_spotter_v9"
+      model_name: "SoccerSpotterV9"
+      model_version: "v9"
+      description: "5-class SoccerNet PCA512 TCN+Transformer spotter with eventness and uncertainty-aware offset heads."
+      checkpoint_path: "storage/models/action_spotting/soccer_spotter_v9/v9_best_model.pth"
+      config_path: "configs/models/action_spotting/soccer_spotter_v9/v9_config.json"
+      inference_policy_path: "configs/models/action_spotting/soccer_spotter_v9/inference_policy.json"
+      expected_checkpoint_sha256: "b58db272f1feb43f548e0e8ee82df9b8bdbfe1e441fb14da0376f09ec056150c"
+      postprocess_config_path: "configs/highlight_spotting.yaml"
+      enabled: true
+
+  player_tracking:
+    dummy:
+      id: "dummy_player_tracking_v1"
+      model_name: "DummyPlayerTrackingTask"
+      model_version: "0.1.0"
+      description: "8~15회차에서 프론트 선수별 모드 연결과 실제 tracker 교체 준비를 위해 사용할 dummy player tracking task."
+      checkpoint_path: null
+      config_path: null
+      enabled: true

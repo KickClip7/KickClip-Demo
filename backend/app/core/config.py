@@ -1,0 +1,419 @@
+"""Application configuration.
+
+환경변수와 프로젝트 루트의 .env 파일에서 애플리케이션 설정을 불러온다.
+"""
+
+import json
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE_PATH = PROJECT_ROOT / ".env"
+
+
+class Settings(BaseSettings):
+    """KickClip 애플리케이션 설정."""
+
+    model_config = SettingsConfigDict(
+        env_file=ENV_FILE_PATH,
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore",
+    )
+
+    # -------------------------------------------------------------------------
+    # Application
+    # -------------------------------------------------------------------------
+    PROJECT_NAME: str = "KickClip Studio Backend"
+    SERVICE_NAME: str = "kickclip-backend"
+    VERSION: str = "0.1.0"
+
+    ENV: Literal["local", "dev", "test", "prod"] = Field(
+        default="local",
+        description="애플리케이션 실행 환경",
+    )
+    DEBUG: bool = Field(
+        default=True,
+        validation_alias="KICKCLIP_DEBUG",
+    )
+
+    API_V1_PREFIX: str = "/api/v1"
+
+    # -------------------------------------------------------------------------
+    # CORS
+    # -------------------------------------------------------------------------
+    # pydantic-settings는 list[str] 환경변수를 JSON 배열로 파싱하려고 하므로,
+    # 문자열로 받은 뒤 cors_origins 속성에서 직접 변환한다.
+    BACKEND_CORS_ORIGINS: str = (
+        "http://localhost:3000,"
+        "http://localhost:5173,"
+        "http://127.0.0.1:3000,"
+        "http://127.0.0.1:5173"
+    )
+
+    # -------------------------------------------------------------------------
+    # Storage
+    # -------------------------------------------------------------------------
+    STORAGE_ROOT: Path = Path("storage")
+    # 목업 데이터 사용은 반드시 .env에서 명시적으로 켠다.
+    # 기본값을 False로 두어 실제 데이터 운영 경로가 기본 동작이 되도록 한다.
+    USE_MOCK_DATA: bool = False
+    MOCK_SHARED_ACCESS_ENABLED: bool = False
+    MOCK_TIMELINE_SOURCE_MATCH_ID: str = "korjpn_2026"
+    MOCK_VIDEO_SOURCE_PATH: Path = Path("test_data.mp4")
+    MOCK_VIDEO_LINK_MODE: Literal["auto", "hardlink", "copy"] = "auto"
+    AGENT_DEV_MATCH_ID: str = ""
+
+    # -------------------------------------------------------------------------
+    # Database
+    # -------------------------------------------------------------------------
+    DATABASE_URL: str = (
+        "postgresql+psycopg://kickclip:kickclip@localhost:5432/kickclip"
+    )
+    DB_ECHO: bool = False
+    # The backend runs long-lived AI/background jobs alongside frequent status
+    # polling.  Keep a modest application pool, but make the limits explicit so
+    # pool starvation is observable/configurable instead of relying on
+    # SQLAlchemy's implicit 5 + 10 defaults.
+    DB_POOL_SIZE: int = Field(default=10, ge=1, le=50)
+    DB_MAX_OVERFLOW: int = Field(default=10, ge=0, le=50)
+    DB_POOL_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
+    DB_POOL_RECYCLE_SECONDS: int = Field(default=1800, ge=60)
+    # Long-running scene-AI/tracking workers use an independent, small pool so
+    # they cannot exhaust the request-serving FastAPI pool while inference or
+    # subprocess work is in progress.
+    DB_BACKGROUND_POOL_SIZE: int = Field(default=4, ge=1, le=20)
+    DB_BACKGROUND_MAX_OVERFLOW: int = Field(default=2, ge=0, le=20)
+    # Candidate/evidence media requests use a dedicated pool.  These routes can
+    # be bursty (many cards/assets requested together), so they must never
+    # consume the general API pool used by auth/status/control requests.
+    DB_MEDIA_POOL_SIZE: int = Field(default=4, ge=1, le=20)
+    DB_MEDIA_MAX_OVERFLOW: int = Field(default=0, ge=0, le=20)
+    # Application-level gate for candidate/evidence media.  Keep this <= the
+    # dedicated media pool size so a request never waits for a DB connection
+    # while already occupying a media worker slot.
+    CANDIDATE_MEDIA_MAX_CONCURRENT_REQUESTS: int = Field(default=4, ge=1, le=16)
+
+    # -------------------------------------------------------------------------
+    # Champion Action Spotting provenance/runtime diagnostics
+    # -------------------------------------------------------------------------
+    ACTION_SPOTTING_AI_PROJECT_ROOT: str = ""
+    ACTION_SPOTTING_PYTHON_EXECUTABLE: str = ""
+    # Optional local/dev bootstrap for a pre-extracted merged SoccerNet feature
+    # array [T, 512]. Empty keeps the normal feature-extraction path and makes
+    # ensure_preloaded_half_features() a no-op.
+    PRELOADED_FEATURE_NPY_PATH: str = ""
+
+    # -------------------------------------------------------------------------
+    # Qwen
+    # -------------------------------------------------------------------------
+    QWEN_MODEL_ID: str = "Qwen/Qwen2.5-VL-3B-Instruct"
+    # 16GB 메모리 장비에서 스왑 없이 돌 수 있는 수준으로 기본값을 잡는다.
+    # 프레임 수·이미지 해상도가 비전 토큰 수(=prefill 시간·메모리)를 결정한다.
+    QWEN_EXPORT_SAMPLE_FRAMES: int = Field(default=6, ge=1)
+    QWEN_MAX_NEW_TOKENS: int = Field(default=384, ge=1)
+    QWEN_MIN_PIXELS: int = Field(default=128 * 28 * 28, ge=28 * 28)
+    QWEN_MAX_PIXELS: int = Field(default=256 * 28 * 28, ge=28 * 28)
+    # 생성 단계가 이 시간을 넘기면 중단하고 지금까지의 출력으로 응답한다(무한 대기 방지).
+    QWEN_GENERATE_TIMEOUT_SECONDS: float = Field(default=180.0, gt=0)
+
+    # -------------------------------------------------------------------------
+    # OpenAI / LangGraph
+    # -------------------------------------------------------------------------
+    OPENAI_API_KEY: str = ""
+    OPENAI_AGENT_MODEL: str = "gpt-4o-mini"
+    OPENAI_AGENT_TIMEOUT_SECONDS: float = Field(default=90.0, gt=0)
+
+    # -------------------------------------------------------------------------
+    # Authentication
+    # -------------------------------------------------------------------------
+    AUTH_SECRET_KEY: str = "local-development-only-change-me-please-32chars"
+    AUTH_ACCESS_TOKEN_MINUTES: int = Field(default=15, ge=1)
+    AUTH_REFRESH_TOKEN_DAYS: int = Field(default=30, ge=1)
+    MEDIA_SIGNED_URL_MINUTES: int = Field(default=10, ge=1)
+
+    # -------------------------------------------------------------------------
+    # Target-centric tracking runtime
+    # -------------------------------------------------------------------------
+    # Tracking은 별도 AI 프로젝트/conda 환경에서 subprocess로 실행한다.
+    # 빈 경로는 "설정되지 않음"을 뜻하며 verifier가 기능을 unavailable로 표시한다.
+    TRACKING_ENABLED: bool = False
+    TRACKING_PROJECT_ROOT: str = ""
+    # Canonical product runtime. This must point to
+    # tracking_source/target_centric_tracking_e2e_v1/run_target_centric_pipeline.py.
+    TRACKING_E2E_SCRIPT_PATH: str = ""
+    # Legacy compatibility only. New tracking jobs MUST NOT route through this.
+    TRACKING_SCENE_SELECTION_R3_SCRIPT_PATH: str = ""
+    TRACKING_VERIFY_SCRIPT_PATH: str = ""
+    TRACKING_PYTHON_EXECUTABLE: str = ""
+    TRACKING_OUTPUT_ROOT: str = ""
+    TRACKING_DEVICE: Literal["auto", "cuda", "cpu"] = "auto"
+    TRACKING_REACQUISITION_MODE: Literal["assisted"] = "assisted"
+    TRACKING_MAX_CONCURRENT_JOBS: int = Field(default=1, ge=1, le=8)
+    TRACKING_PROCESS_TIMEOUT_SECONDS: int = Field(default=21600, ge=60)
+    TRACKING_VERIFY_TIMEOUT_SECONDS: int = Field(default=300, ge=10)
+    TRACKING_PREVIEW_ENABLED: bool = True
+    # Backend product integration. When enabled, the canonical E2E entrypoint
+    # tracks both directions from the user-confirmed anchor and merges the
+    # result back onto the whole Action Spotting scene timeline.
+    TRACKING_FULL_SCENE: bool = True
+    # The user-selected reference crops are trusted identity seeds. They are
+    # used by the product E2E wrapper for Sports-OSNet ranking while the frozen
+    # V1/V2 research sources remain byte-for-byte unchanged.
+    TRACKING_USE_SELECTED_REFERENCE_MEMORY: bool = True
+
+    # -------------------------------------------------------------------------
+    # Scene target selection / event ranking frozen AI runtime
+    # -------------------------------------------------------------------------
+    SCENE_DISCOVERY_PROJECT_ROOT: str = ""
+    SCENE_DISCOVERY_PYTHON_EXECUTABLE: str = ""
+    SCENE_DISCOVERY_SCRIPT_PATH: str = ""
+    SCENE_DISCOVERY_VERIFY_SCRIPT_PATH: str = ""
+    SCENE_DISCOVERY_MANIFEST_PATH: str = ""
+    SCENE_DISCOVERY_MANIFEST_SHA256: str = ""
+    SCENE_DISCOVERY_PROCESS_TIMEOUT_SECONDS: int = Field(
+        default=21600,
+        ge=60,
+    )
+    SCENE_TARGET_SELECTION_PROJECT_ROOT: str = ""
+    SCENE_TARGET_SELECTION_PYTHON_EXECUTABLE: str = ""
+    SCENE_TARGET_SELECTION_SCRIPT_PATH: str = ""
+    SCENE_TARGET_REVIEWABILITY_SCRIPT_PATH: str = ""
+    SCENE_TARGET_SELECTION_VERIFY_SCRIPT_PATH: str = ""
+    SCENE_TARGET_SELECTION_MANIFEST_PATH: str = ""
+    SCENE_TARGET_SELECTION_MANIFEST_SHA256: str = ""
+    SCENE_TARGET_SELECTION_PROCESS_TIMEOUT_SECONDS: int = Field(
+        default=21600,
+        ge=60,
+    )
+    SCENE_TARGET_SELECTION_MAX_CONFIRMABLE_EARLIER_RANK: int = Field(
+        default=5,
+        ge=1,
+        le=100,
+    )
+    SCENE_TARGET_SELECTION_MAX_CONCURRENT_JOBS: int = Field(
+        default=1,
+        ge=1,
+        le=8,
+    )
+    # Legacy R1/R2/R3 compatibility settings retained only so existing
+    # scene-selection/event-ranking modules and older .env files continue to load.
+    # They are not dependencies of the canonical target-centric tracking runtime.
+    TRACKING_SCENE_SELECTION_VERIFY_SCRIPT_PATH: str = ""
+    TRACKING_R2_MANIFEST_PATH: str = ""
+    TRACKING_R2_MANIFEST_SHA256: str = ""
+    TRACKING_R3_MANIFEST_PATH: str = ""
+    TRACKING_R3_MANIFEST_SHA256: str = ""
+    EVENT_CANDIDATE_RANKING_SCRIPT_PATH: str = ""
+    EVENT_CANDIDATE_RANKING_VERIFY_SCRIPT_PATH: str = ""
+
+    # -------------------------------------------------------------------------
+    # Scene-local player candidate detector
+    # -------------------------------------------------------------------------
+    PLAYER_DETECTOR_BACKEND: Literal["rfdetr", "hog"] = "rfdetr"
+    PLAYER_DETECTOR_CHECKPOINT: Path = (
+        PROJECT_ROOT
+        / ".tracking-runtime"
+        / "weights"
+        / "rfdetr"
+        / "checkpoint_best_regular.pth"
+    )
+    PLAYER_DETECTOR_DEVICE: Literal["auto", "cuda", "mps", "cpu"] = "auto"
+    PLAYER_DETECTOR_ALLOW_HOG_FALLBACK: bool = False
+    # Legacy compatibility setting. New RF-DETR routing uses the explicit
+    # base/play/observation thresholds below. Keep this field so older local
+    # .env files and unrelated call sites continue to load safely.
+    PLAYER_DETECTOR_CONFIDENCE_THRESHOLD: float = Field(
+        default=0.25,
+        gt=0,
+        le=1,
+    )
+    PLAYER_DETECTOR_BATCH_SIZE: int = Field(default=6, ge=1, le=32)
+
+    # ---------------------------------------------------------------------
+    # Fine-tuned RF-DETR soccer inference contract
+    # ---------------------------------------------------------------------
+    # Checkpoint classes are fixed to:
+    #   0 player, 1 goalkeeper, 2 referee, 3 staff, 4 ball
+    RFDETR_BASE_CONF_THRESHOLD: float = Field(default=0.15, gt=0, le=1)
+
+    # Wide / live-play candidate and tracking policy. Class lists stay as
+    # strings in Settings so .env can use the natural `0,1` syntax instead
+    # of JSON arrays. Use the parsed *_class_ids properties below in code.
+    TRACKING_PLAY_CLASSES: str = "0,1"
+    TRACKING_PLAY_CONF_THRESHOLD: float = Field(default=0.15, gt=0, le=1)
+    TRACKING_IOU_THRESHOLD: float = Field(default=0.5, ge=0, le=1)
+    TRACKING_TRACKER: str = "botsort"
+
+    # Close-up / replay / bench observation policy. All five RF-DETR classes
+    # are retained here so referee/staff labels are not thrown away before
+    # candidate-role filtering.
+    OBSERVATION_CLASSES: str = "0,1,2,3,4"
+    OBSERVATION_CONF_THRESHOLD: float = Field(default=0.25, gt=0, le=1)
+    OBSERVATION_CROP_TOP_K: int = Field(default=3, ge=1, le=20)
+
+    # Close-up classification and crop eligibility.
+    CLOSEUP_MIN_BOX_HEIGHT_RATIO: float = Field(default=0.35, gt=0, le=1)
+    CLOSEUP_MIN_BOX_AREA_RATIO: float = Field(default=0.08, gt=0, le=1)
+    CLOSEUP_CROP_MIN_CONF: float = Field(default=0.25, gt=0, le=1)
+    CLOSEUP_CROP_MIN_HEIGHT_RATIO: float = Field(default=0.20, gt=0, le=1)
+    CLOSEUP_CROP_MIN_AREA_RATIO: float = Field(default=0.03, gt=0, le=1)
+
+    # -------------------------------------------------------------------------
+    # Developer mode
+    # -------------------------------------------------------------------------
+    # 다른 사용자의 리소스에 접근할 수 있는 개발 전용 기능이다.
+    # 운영 환경에서는 항상 비활성화해야 한다.
+    DEVELOPER_MODE_ENABLED: bool = False
+    DEVELOPER_ACCESS_KEY: str = ""
+
+    @staticmethod
+    def _parse_detector_class_ids(raw: str, *, field_name: str) -> frozenset[int]:
+        values: set[int] = set()
+        for token in str(raw or "").split(","):
+            token = token.strip()
+            if not token:
+                continue
+            try:
+                class_id = int(token)
+            except ValueError as exc:
+                raise ValueError(
+                    f"{field_name} must be a comma-separated integer list."
+                ) from exc
+            if class_id < 0 or class_id > 4:
+                raise ValueError(
+                    f"{field_name} contains unsupported RF-DETR class id "
+                    f"{class_id}; expected ids are 0..4."
+                )
+            values.add(class_id)
+        if not values:
+            raise ValueError(f"{field_name} must contain at least one class id.")
+        return frozenset(values)
+
+    @property
+    def tracking_play_class_ids(self) -> frozenset[int]:
+        return self._parse_detector_class_ids(
+            self.TRACKING_PLAY_CLASSES, field_name="TRACKING_PLAY_CLASSES"
+        )
+
+    @property
+    def observation_class_ids(self) -> frozenset[int]:
+        return self._parse_detector_class_ids(
+            self.OBSERVATION_CLASSES, field_name="OBSERVATION_CLASSES"
+        )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """CORS origin 문자열을 정규화된 리스트로 반환한다.
+
+        다음 두 형식을 지원한다.
+
+        1. 쉼표 구분 문자열
+           http://localhost:3000,http://localhost:5173
+
+        2. JSON 배열
+           ["http://localhost:3000", "http://localhost:5173"]
+        """
+
+        raw_origins = self.BACKEND_CORS_ORIGINS.strip()
+
+        if not raw_origins:
+            return []
+
+        if raw_origins.startswith("["):
+            try:
+                parsed_origins = json.loads(raw_origins)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "BACKEND_CORS_ORIGINS의 JSON 배열 형식이 올바르지 않습니다."
+                ) from exc
+
+            if not isinstance(parsed_origins, list):
+                raise ValueError(
+                    "BACKEND_CORS_ORIGINS는 JSON 배열 또는 "
+                    "쉼표로 구분된 문자열이어야 합니다."
+                )
+
+            origins = parsed_origins
+        else:
+            origins = raw_origins.split(",")
+
+        normalized_origins: list[str] = []
+
+        for origin in origins:
+            normalized_origin = str(origin).strip().rstrip("/")
+
+            if (
+                normalized_origin
+                and normalized_origin not in normalized_origins
+            ):
+                normalized_origins.append(normalized_origin)
+
+        return normalized_origins
+
+    @property
+    def is_production(self) -> bool:
+        """현재 운영 환경인지 반환한다."""
+
+        return self.ENV == "prod"
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        """운영 환경에서 위험한 설정이 활성화되지 않도록 검증한다."""
+
+        if not self.is_production:
+            return self
+
+        if self.DEBUG:
+            raise ValueError(
+                "운영 환경에서는 KICKCLIP_DEBUG=false로 설정해야 합니다."
+            )
+
+        if self.DEVELOPER_MODE_ENABLED:
+            raise ValueError(
+                "운영 환경에서는 DEVELOPER_MODE_ENABLED를 "
+                "활성화할 수 없습니다."
+            )
+
+        if self.USE_MOCK_DATA:
+            raise ValueError(
+                "운영 환경에서는 USE_MOCK_DATA를 활성화할 수 없습니다."
+            )
+
+        if self.MOCK_SHARED_ACCESS_ENABLED:
+            raise ValueError(
+                "운영 환경에서는 MOCK_SHARED_ACCESS_ENABLED를 "
+                "활성화할 수 없습니다."
+            )
+
+        if self.AGENT_DEV_MATCH_ID.strip():
+            raise ValueError(
+                "운영 환경에서는 AGENT_DEV_MATCH_ID를 설정할 수 없습니다."
+            )
+
+        insecure_secret_keys = {
+            "local-development-only-change-me-please-32chars",
+            "replace-with-at-least-32-random-characters",
+        }
+
+        if (
+            len(self.AUTH_SECRET_KEY) < 32
+            or self.AUTH_SECRET_KEY in insecure_secret_keys
+        ):
+            raise ValueError(
+                "운영 환경에서는 32자 이상의 안전한 "
+                "AUTH_SECRET_KEY를 설정해야 합니다."
+            )
+
+        return self
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """애플리케이션 설정을 생성하고 프로세스 내에서 캐싱한다."""
+
+    return Settings()

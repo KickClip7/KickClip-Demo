@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["vite/client"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/api/contracts.js",
+    "src/api/kickclipApi.js",
+    "src/api/adapters.js",
+    "src/domain/**/*.js",
+    "src/routing.js"
+  ]
+}

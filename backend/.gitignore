@@ -1,0 +1,325 @@
+# =============================================================================
+# Environment and local configuration
+# =============================================================================
+
+.env
+.env.*
+!.env*.example
+*.local
+
+
+# =============================================================================
+# Python bytecode and caches
+# =============================================================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+.hypothesis/
+.dmypy.json
+.dmypy.json.*
+.tox/
+.nox/
+
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+
+# =============================================================================
+# Virtual environments and Python packaging
+# =============================================================================
+
+.venv/
+.venv-tracking/
+venv/
+venv311/
+env/
+ENV/
+
+pip-wheel-metadata/
+__pypackages__/
+build/
+dist/
+*.egg-info/
+
+
+# =============================================================================
+# Logs and temporary runtime files
+# =============================================================================
+
+*.log
+logs/
+
+*.pid
+*.pid.lock
+
+*.tmp
+*.temp
+*.bak
+*.orig
+tmp/
+temp/
+
+# Local backups and database snapshots
+/_backups/
+/backups/
+*.dump
+
+
+# =============================================================================
+# Local databases
+# =============================================================================
+
+*.db
+*.sqlite
+*.sqlite3
+
+
+# =============================================================================
+# Generated storage, uploads, renders, and AI artifacts
+# =============================================================================
+
+storage/*
+
+# storage/matches 디렉터리 접근 허용
+!storage/matches/
+
+# matches 아래는 기본적으로 모두 제외
+storage/matches/*
+
+# 팀 공용 목업 경기 디렉터리만 접근 허용
+!storage/matches/korjpn_2026/
+
+# 목업 경기 디렉터리 내부도 기본적으로 모두 제외
+storage/matches/korjpn_2026/*
+
+# 팀이 공유해야 하는 목업 TimelineEvent fixture만 Git에 포함
+!storage/matches/korjpn_2026/timeline_events.json
+
+# 애플리케이션 소스 코드인 app/storage는 추적
+!app/storage/
+!app/storage/*.py
+
+# 런타임 생성 파일
+app/storage/workspaces/
+uploads/
+downloads/
+renders/
+outputs/
+artifacts/
+
+runs/
+wandb/
+mlruns/
+
+
+# =============================================================================
+# Model checkpoints and large data artifacts
+# =============================================================================
+
+checkpoints/
+models/
+
+*.pt
+*.pth
+*.onnx
+*.ckpt
+*.safetensors
+
+*.pkl
+*.pickle
+*.joblib
+
+*.npy
+*.npz
+*.parquet
+*.feather
+*.h5
+*.hdf5
+
+# 프로젝트에서 의도적으로 관리하는 Action Spotting 모델 설정/파일
+# 위의 models/, *.pth 등의 규칙보다 아래 예외가 나중에 와야 함
+!configs/models/
+!configs/models/action_spotting/
+!configs/models/action_spotting/best_soccer_model/
+!configs/models/action_spotting/best_soccer_model/**
+
+# Exact runtime bundle for the current Action Spotting Champion.
+!storage/models/
+storage/models/*
+!storage/models/action_spotting/
+storage/models/action_spotting/*
+!storage/models/action_spotting/sampling_v1_loss_v2_ms_stem_v1/
+!storage/models/action_spotting/sampling_v1_loss_v2_ms_stem_v1/**
+!storage/models/action_spotting/sampling_v1_loss_v2_ms_stem_v1/transformer_best.pt
+!storage/models/action_spotting/soccer_spotter_v9/
+!storage/models/action_spotting/soccer_spotter_v9/v9_best_model.pth
+
+# Training/evaluation reports are outputs, not runtime inputs.
+storage/models/**/transformer_history.json
+storage/models/**/valid_eval.json
+
+
+# =============================================================================
+# Video, audio, and media files
+# =============================================================================
+
+# test_data.mp4도 이 규칙으로 Git에서 제외됨
+*.mp4
+*.m4v
+*.mov
+*.mkv
+*.avi
+*.webm
+*.wmv
+*.flv
+*.mpg
+*.mpeg
+*.ts
+*.mts
+*.m2ts
+*.3gp
+
+*.wav
+*.mp3
+*.aac
+*.flac
+*.m4a
+
+
+# =============================================================================
+# Generated subtitles, timelines, and analysis exports
+# =============================================================================
+
+*.srt
+*.vtt
+*.ass
+*.edl
+*.fcpxml
+
+*.csv
+*.tsv
+
+
+# =============================================================================
+# Local documentation drafts
+# =============================================================================
+
+# README.md와 docs/의 공식 문서는 Git에 포함
+# 개인 초안만 제외
+notes/
+docs/drafts/
+*.local.md
+
+
+# =============================================================================
+# Archives and large bundles
+# =============================================================================
+
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+
+# =============================================================================
+# OS and editor files
+# =============================================================================
+
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+.idea/
+.vscode/
+
+*.swp
+*.swo
+
+
+# =============================================================================
+# Tooling metadata
+# =============================================================================
+
+.cache/
+.agents/
+.codex/
+
+# Local extraction of the separately distributed tracking runtime bundle.
+/.tracking-runtime/
+
+# Pristine distribution copy of the frozen tracking runtime (122MB 가중치 포함 — GitHub 업로드 금지).
+/kickclip_tracking_runtime_minimal_20260730/
+
+# Local-only tracking development and handoff materials.
+# Backend integration code under app/ and database migrations remain tracked.
+/tracking_runtime_adapter/
+/handoff/
+/handoffs/
+/scripts/inspect_tracking_anchor.py
+/scripts/install_tracking_runtime_adapter.py
+/docs/tracking_*.md
+/docs/tracking_*.json
+/docs/tracking_incidents/
+/docs/scene_target_selection_implementation_audit_*.md
+/tests/test_tracking_*.py
+/tests/test_scene_target_selection_backend.py
+/tests/test_scene_target_reviewability_backend.py
+.pytest_tmp/
+
+# The cleaned tracking runtime is source-controlled. Its own .gitignore keeps
+# generated outputs and the separately distributed RF-DETR checkpoint local.
+!tracking_source/
+!tracking_source/**
+
+storage/tracking_runtime/
+.runtime/
+
+
+# =============================================================================
+# Generated verification, diagnostics, and handoff outputs
+# =============================================================================
+
+/test_evidence/
+/diagnostics/
+/deliverables/
+
+# Browser profiles created by local end-to-end tests may contain session data.
+**/chrome-profile/
+**/browser-profile/
+**/user-data-dir/
+
+
+# =============================================================================
+# Credentials, signing keys, and local cloud configuration
+# =============================================================================
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+.secrets/
+secrets/
+credentials/
+
+# Common local credential files. Keep checked-in examples/templates explicit.
+service-account*.json
+service_account*.json
+credentials*.json
+!credentials*.example.json
+
+phase4a_input_bundle/
+phase4a_live_error_bundle/
